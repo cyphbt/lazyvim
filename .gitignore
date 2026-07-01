@@ -9,3 +9,5 @@ data
 .moonshot_key
 .moonshot_open_platform_key
 .openclaw/
+.nvimlog
+*.bak
