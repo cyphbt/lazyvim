@@ -20,6 +20,11 @@ return {
   {
     "neovim/nvim-lspconfig",
     opts = {
+      -- go.mod 没有有用的类型内联提示；gopls 在内容未输入完整时，
+      -- inlayHint 请求会返回解析错误并被 Neovim 弹成通知。
+      inlay_hints = {
+        exclude = { "vue", "gomod" },
+      },
       servers = {
         gopls = {
           settings = {
@@ -28,6 +33,15 @@ return {
                 unusedparams = true,
               },
               staticcheck = true,
+              hints = {
+                assignVariableTypes = false,
+                compositeLiteralFields = false,
+                compositeLiteralTypes = false,
+                constantValues = false,
+                functionTypeParameters = false,
+                parameterNames = false,
+                rangeVariableTypes = false,
+              },
             },
           },
           -- 过滤特定的 staticcheck 诊断
@@ -44,19 +58,20 @@ return {
                   local filtered = {}
                   for _, diag in ipairs(result.diagnostics) do
                     local message = diag.message or ""
-                    
-                    -- 通过消息内容匹配（最可靠的方法）
-                    -- 匹配 ST1003 和 ST1021 的诊断消息
-                    if message:match("ST1003") or message:match("ST1021") then
-                      -- 跳过这个诊断
-                    -- 匹配命名约定相关的提示（如 "should be ...ID" 或 "should be ...URL"）
+                    local severity = diag.severity or 0
+
+                    -- 只保留 ERROR (1) 和 WARNING (2)，过滤掉 INFO (3) 和 HINT (4)
+                    -- go.mod 中 gopls 会产生大量无用 HINT/INFO，疯狂在行尾刷屏
+                    if severity == 3 or severity == 4 then
+                      -- 跳过
+                    -- 匹配 ST1003（命名约定）和 ST1021（导出注释格式）
+                    elseif message:match("ST1003") or message:match("ST1021") then
+                      -- 跳过
                     elseif message:match("should be.*ID") or message:match("should be.*URL") then
-                      -- 跳过这个诊断
-                    -- 匹配注释格式相关的提示
+                      -- 跳过
                     elseif message:match("comment on exported type.*should be of the form") then
-                      -- 跳过这个诊断
+                      -- 跳过
                     else
-                      -- 保留其他诊断
                       table.insert(filtered, diag)
                     end
                   end
@@ -76,12 +91,29 @@ return {
     },
   },
 
+  -- go.mod 仍由 gopls 格式化，但编辑到一半时不弹出格式化失败通知。
+  {
+    "stevearc/conform.nvim",
+    opts = {
+      formatters_by_ft = {
+        gomod = {
+          lsp_format = "fallback",
+          quiet = true,
+        },
+      },
+    },
+  },
+
   -- Go 工具增强
   {
     "ray-x/go.nvim",
     dependencies = { "ray-x/guihua.lua" },
     config = function()
       require("go").setup({
+        -- 由 LazyVim 按 filetype 管理；避免 go.nvim 全局重新启用 gomod inlay hints。
+        lsp_inlay_hints = {
+          enable = false,
+        },
         -- LazyVim 已通过 conform.nvim 处理 format on save，避免重复格式化
         format = {
           format_on_save = false,

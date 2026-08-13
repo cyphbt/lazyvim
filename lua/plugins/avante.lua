@@ -90,8 +90,8 @@ return {
     },
     behaviour = {
       auto_focus_sidebar = true,
-      acp_follow_agent_locations = true,
       auto_focus_on_diff_view = true,
+      acp_follow_agent_locations = true,
     },
     -- 侧边栏位置
     windows = {
